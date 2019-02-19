@@ -15,7 +15,7 @@ for type in ["cats", "dogs"]:
                 command = "wget " + line.rstrip()
                 print('Calling: '+command)
                 try:
-                    subprocess.run(['wget', line.rstrip()])
+                    subprocess.run(['wget', line.rstrip(), '--timeout=5', '--tries=1', '--timestamping'])
                 except Exception as e:
                     print('  -- failed: ',e)
 
