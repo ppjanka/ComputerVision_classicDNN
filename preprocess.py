@@ -1,4 +1,6 @@
 
+# TODO: it would be much more efficient to process large batches of files (to prevent waiting for IO to/from the GPU) -- that requires error handling for corrupt files within the TF graph itself
+
 batch_size = 1
 output_pathstem = '/DATA/Dropbox/LOOTRPV/Personal_programming/MachineLearning/Tutorials/ImageRecognition/data_preprocessed/'
 
@@ -43,10 +45,22 @@ for extension in extensions:
 def get_filenames (label, ext):
     import os
     import glob
+    import numpy as np
     base_dir = os.getcwd()
+    stem = base_dir + '/data/' + label + '/'
+    # return the list of filepaths for the given extension
     def either(c):
         return '[%s%s]' % (c.lower(), c.upper()) if c.isalpha() else c
-    return glob.glob(base_dir + '/data/' + label + '/*.' + ''.join(list(map(either,ext))))
+    # rename files in the data folder to comply with Unicode-8
+    filenames = glob.glob(stem + '*.' + ''.join(list(map(either,ext))))
+    if np.array([not x.split('/')[-1].split('.')[0].isdigit() for x in filenames]).any():
+        print('Renaming files for label %s... ' % label, end='', flush=True)
+        i = 0
+        for filename in filenames:
+            os.rename(filename, stem + ('%05i.' % i) + filename.split('/')[-1].split('.')[1])
+            i += 1
+        print('done.', flush=True)
+    return glob.glob(stem + '*.' + ''.join(list(map(either,ext))))
 
 if __name__ == '__main__':
 
@@ -55,8 +69,8 @@ if __name__ == '__main__':
     for label in ['cats','dogs']:
         for extension in extensions:
             filenames = [[],[]]
-            filenames[0] = get_filenames(label, extension)[:2]
-            filenames[1] = [output_pathstem + label + '/' + str(i) + '.jpg' for i in range(len(filenames[0]))]
+            filenames[0] = get_filenames(label, extension)
+            filenames[1] = [output_pathstem + label + '/' + ('%05i' % i) + '.jpg' for i in range(len(filenames[0]))]
             if len(filenames) < 1 : continue
             filenames = tf.transpose(tf.constant(filenames, dtype=tf.string))
 
@@ -73,6 +87,8 @@ if __name__ == '__main__':
                             sess.run(tf.write_file(filename[0], image_processed[0]))
                             processed += 1
                         except tf.errors.InvalidArgumentError:
+                            io_errors += 1
+                        except tf.errors.DataLossError:
                             io_errors += 1
                 except tf.errors.OutOfRangeError:
                     pass
