@@ -4,6 +4,8 @@
 batch_size = 1
 output_pathstem = '/DATA/Dropbox/LOOTRPV/Personal_programming/MachineLearning/Tutorials/ImageRecognition/data_preprocessed/'
 
+min_variance = 0.1**2 # a lower cutoff to stddev to filter 'not found' images
+min_unique = 100 # minimum number of unique color values for the image
 goal_shape = [256,256]
 extensions = ['jpg', 'png', 'bmp', 'gif']
 output_color_depth = 128 # output image will be between 0 and 2x this value
@@ -26,9 +28,13 @@ def _preprocess_image (filename, ext):
         image_decoded = tf.squeeze(image_decoded, axis=0)
     else:
         return tf.random.normal([*goal_shape, 1])
+    # counting unique color values will detect and allow to discard text etc
+    no_unique = tf.size(tf.unique(tf.reshape(image_decoded, [-1,]))[0])
     image_decoded = tf.image.convert_image_dtype(image_decoded, tf.float32)
+    # calculate standard deviation to decide if calculate further
+    mean, var = tf.nn.moments(image_decoded, axes=[0,1,2])
     image_grayscale = tf.cond(tf.shape(image_decoded)[2] > 1, \
-        lambda: tf.image.rgb_to_grayscale(image_decoded), \
+        lambda : tf.image.rgb_to_grayscale(image_decoded), \
         lambda : image_decoded)
     image_resized = tf.image.resize_images(image_grayscale, size=goal_shape, preserve_aspect_ratio=True)
     image_resized = tf.image.resize_image_with_crop_or_pad(image_resized, *goal_shape) # will pad with 0s
@@ -36,7 +42,12 @@ def _preprocess_image (filename, ext):
     #image_standard = tf.image.per_image_standardization(image_resized) * output_color_depth + output_color_depth
     image_standard = tf.image.convert_image_dtype(image_standard, tf.uint8)
     image_encoded = tf.image.encode_jpeg(image_standard)
-    return image_encoded, filename[1]
+    # apply stddev condition
+    image_result = tf.cond( \
+        tf.logical_and(var > min_variance, no_unique > min_unique), \
+        lambda : image_encoded, \
+        lambda : tf.constant('', dtype=tf.string)) # don't do other steps if we filter
+    return var, no_unique, image_result, filename[1]
 
 preprocess_image = {}
 for extension in extensions:
@@ -79,12 +90,20 @@ if __name__ == '__main__':
             iterator = dataset.make_one_shot_iterator()
             next_element = iterator.get_next()
 
+            var, no_unique, image_processed, filename = next_element
+            condition = tf.logical_and(var > min_variance, no_unique > min_unique)
+            image_processed = tf.boolean_mask(image_processed, condition)
+            filename = tf.boolean_mask(filename, condition)
+
             with tf.Session() as sess:
                 try:
                     while True:
                         try:
-                            image_processed, filename = sess.run(next_element)
-                            sess.run(tf.write_file(filename[0], image_processed[0]))
+                            img, fn = sess.run([image_processed, filename])
+                            # write file without GPU IO, using cpu
+                            with tf.device('/device:CPU:0'):
+                                for i in range(len(fn)):
+                                    _ = sess.run(tf.write_file(fn[i], img[i]))
                             processed += 1
                         except tf.errors.InvalidArgumentError:
                             io_errors += 1
@@ -92,5 +111,7 @@ if __name__ == '__main__':
                             io_errors += 1
                 except tf.errors.OutOfRangeError:
                     pass
+            #from tensorflow.python.client import device_lib
+            #print(device_lib.list_local_devices())
 
     print('Processed %i files. %i aborted due to IO errors.' % (processed, io_errors))
