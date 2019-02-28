@@ -1,14 +1,11 @@
 
 # TODO: it would be much more efficient to process large batches of files (to prevent waiting for IO to/from the GPU) -- that requires error handling for corrupt files within the TF graph itself
 
+exec(open("./globals.py").read()) # read global variables
+
 batch_size = 1
 output_pathstem = '/DATA/Dropbox/LOOTRPV/Personal_programming/MachineLearning/Tutorials/ImageRecognition/data_preprocessed/'
-
-min_variance = 0.1**2 # a lower cutoff to stddev to filter 'not found' images
-min_unique = 100 # minimum number of unique color values for the image
-goal_shape = [256,256]
-extensions = ['jpg', 'png', 'bmp', 'gif']
-output_color_depth = 128 # output image will be between 0 and 2x this value
+extensions = ['jpg', 'png', 'bmp', 'gif'] # raw input file formats
 
 # sources:
 # - https://www.tensorflow.org/guide/datasets
@@ -27,7 +24,7 @@ def _preprocess_image (filename, ext):
         image_decoded = tf.image.decode_gif(image_string)
         image_decoded = tf.squeeze(image_decoded, axis=0)
     else:
-        return tf.random.normal([*goal_shape, 1])
+        return tf.random.normal([*X_shape, 1])
     # counting unique color values will detect and allow to discard text etc
     no_unique = tf.size(tf.unique(tf.reshape(image_decoded, [-1,]))[0])
     image_decoded = tf.image.convert_image_dtype(image_decoded, tf.float32)
@@ -36,11 +33,9 @@ def _preprocess_image (filename, ext):
     image_grayscale = tf.cond(tf.shape(image_decoded)[2] > 1, \
         lambda : tf.image.rgb_to_grayscale(image_decoded), \
         lambda : image_decoded)
-    image_resized = tf.image.resize_images(image_grayscale, size=goal_shape, preserve_aspect_ratio=True)
-    image_resized = tf.image.resize_image_with_crop_or_pad(image_resized, *goal_shape) # will pad with 0s
-    image_standard = image_resized
-    #image_standard = tf.image.per_image_standardization(image_resized) * output_color_depth + output_color_depth
-    image_standard = tf.image.convert_image_dtype(image_standard, tf.uint8)
+    image_resized = tf.image.resize_images(image_grayscale, size=X_shape, preserve_aspect_ratio=True)
+    image_resized = tf.image.resize_image_with_crop_or_pad(image_resized, *X_shape) # will pad with 0s
+    image_standard = tf.image.convert_image_dtype(image_resized, tf.uint8)
     image_encoded = tf.image.encode_jpeg(image_standard)
     # apply stddev condition
     image_result = tf.cond( \
