@@ -28,7 +28,7 @@ def get_filenames (label, ext, preprocessed=False):
     return glob.glob(stem + '*.' + ''.join(list(map(either,ext))))
 
 # returns a handle to iterator.get_next() of images Dataset to be connected to a comp graph
-def image_batch_handle (preprocessed_folder):
+def image_batch_handle (preprocessed_folder, validation_size=0.2):
 
     with tf.name_scope('IMG_INPUT'):
 
@@ -63,16 +63,32 @@ def image_batch_handle (preprocessed_folder):
         for dataset in datasets[1:]:
             final_dataset = final_dataset.concatenate(dataset)
 
-        # shuffle and return iterator
+        data = {}
+        data['nclass'] = nclass
+        data['label2class'] = label2class
+        data['class2label'] = class2label
+
+        # shuffle
         final_dataset = final_dataset.shuffle(ntotal)
-        final_dataset = final_dataset.batch(batch_size)
-        iterator = final_dataset.make_one_shot_iterator()
-        iter_next = iterator.get_next()
 
-        # import images after drawing a batch
-        img_filenames, labels = iter_next
-        imgs = tf.map_fn(lambda img : tf.image.decode_jpeg(tf.read_file(img)), img_filenames, dtype=tf.uint8)
-        imgs = tf.image.convert_image_dtype(imgs, tf.float32)
-        labels = tf.one_hot(labels, classno)
+        data['train'] = {}; data['val'] = {}
 
-        return imgs, labels, nclass, class2label, label2class
+        # split into training and validation datasets
+        data['train']['dataset'] = final_dataset.take(1.-validation_size)
+        data['val']['dataset'] = final_dataset.skip(1.-validation_size)
+
+        for dataset_type in ['train', 'val']:
+            # divide into batches and return iterator
+            dataset = data[dataset_type]['dataset']
+            dataset = dataset.batch(batch_size)
+            iterator = dataset.make_one_shot_iterator()
+            iter_next = iterator.get_next()
+            # import images after drawing a batch
+            img_filenames, labels = iter_next
+            imgs = tf.map_fn(lambda img : tf.image.decode_jpeg(tf.read_file(img)), img_filenames, dtype=tf.uint8)
+            imgs = tf.image.convert_image_dtype(imgs, tf.float32)
+            labels = tf.one_hot(labels, classno)
+            data[dataset_type]['X'] = imgs
+            data[dataset_type]['y'] = labels
+
+        return data
