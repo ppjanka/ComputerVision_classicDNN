@@ -71,9 +71,8 @@ def image_batch_handle (preprocessed_folder, validation_size=0.2):
         # shuffle
         final_dataset = final_dataset.shuffle(ntotal)
 
-        data['train'] = {}; data['val'] = {}
-
         # split into training and validation datasets
+        data['train'] = {}; data['val'] = {}
         data['train']['dataset'] = final_dataset.take(1.-validation_size)
         data['val']['dataset'] = final_dataset.skip(1.-validation_size)
 
