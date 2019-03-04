@@ -9,3 +9,7 @@ X_shape = [256,256] # shape of a processed image
 
 # processing properties
 batch_size = 4
+
+# allow importing from NNs folder
+import sys
+sys.path.insert(0, './NNs')

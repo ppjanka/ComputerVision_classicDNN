@@ -16,6 +16,7 @@ class NN:
 
         self.X = tf.placeholder(tf.float32, [None, *img_size, 1], name='INPUT')
         self.y = tf.placeholder(tf.float32, [None, n_classes, 1], name='LABELS')
+        self.n_classes = n_classes
 
         self.layers = []
         self.weights = {}
@@ -99,8 +100,8 @@ class NN:
                         train_acc_avg.append(_train_acc)
                         val_cost_avg.append(_val_cost)
                         val_acc_avg.append(_val_acc)
-                    except tf.errors.OutOfRangeError:
-                        pass
+                except tf.errors.OutOfRangeError:
+                    pass
 
                 train_acc_avg = np.mean(train_acc_avg)
                 val_acc_avg = np.mean(val_acc_avg)
