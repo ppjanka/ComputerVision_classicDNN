@@ -3,6 +3,7 @@
 exec(open("./globals.py").read()) # read global variables
 
 import tensorflow as tf
+import numpy as np
 
 import cv_io as cvio
 import cv_train_val as cvtrain
@@ -14,8 +15,10 @@ class NN:
         self.name = name
         self.last_model = init_model
 
-        self.X = tf.placeholder(tf.float32, [None, *img_size, 1], name='INPUT')
-        self.y = tf.placeholder(tf.float32, [None, n_classes, 1], name='LABELS')
+        # "placeholders" to be replaced by data tensors
+        self.X = tf.ones(dtype=tf.float32, shape=[batch_size, *img_size, 1], name='INPUT')
+        self.y = tf.ones(dtype=tf.float32, shape=[batch_size, n_classes, 1], name='LABELS')
+
         self.n_classes = n_classes
 
         self.layers = []
@@ -45,20 +48,25 @@ class NN:
 
         # input
         import os
-        if not os.direxists(preprocessed_folder):
+        if not os.path.isdir(preprocessed_folder):
             print(preprocessed_folder + ' does not exist. Please preprocess data using preprocess.py first.')
             return 0
         data = cvio.image_batch_handle(preprocessed_folder, validation_size=validation_size)
 
         # setup training and validation handles
-        optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['X'], data['train']['y'], self.nn)
-        val_cost, val_acc = cvtrain.validation_handle(data['val']['X'], data['val']['y'], self.nn)
+        optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['y'], self.nn)
+        val_cost, val_acc = cvtrain.validation_handle(data['val']['y'], self.nn)
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)) as sess:
               
             writer = tf.summary.FileWriter('./workspace/log_%s/1/train' % self.name, sess.graph)
 
-            # restore model or initialize variables
+            print('Initializing all variables.. ', end='', flush=True)
+            sess.run(tf.global_variables_initializer())
+            sess.run(tf.local_variables_initializer())
+            print('done.', flush=True)
+
+            # restore model if specified
             if input_model == 'last' and self.last_model != None:
                 print('Restoring the last available model:\n  %s' % self.last_model, flush=True)
                 saver.restore(sess, self.last_model)
@@ -67,16 +75,9 @@ class NN:
                 print('Restoring model:\n  %s' % self.input_model, flush=True)
                 saver.restore(sess, input_model)
                 print('done.', flush=True)
-            else:
-                print('Initializing all variables.. ', end='', flush=True)
-                sess.run(tf.global_variables_initializer())
-                print('done.', flush=True)
 
-            # save initial state
+            # summary init
             merge = tf.summary.merge_all()
-            train_summary = sess.run(merge)
-            writer.add_summary(train_summary)
-            train_writer.flush()
               
             # train
             for epoch in range(n_epoch):
@@ -88,14 +89,20 @@ class NN:
                 val_cost_avg = []
                 val_acc_avg = []
 
+                # initialize dataset iterators
+                _ = sess.run([data['train']['iter_init'], data['val']['iter_init']])
+
                 try:
                     while True:
-                        merge = tf.summary.merge_all()
+                        self.X = data['train']['X']
+                        self.y = data['train']['y']
                         _, _train_cost, _train_acc = sess.run([optimizer, train_cost, train_acc])
+                        self.X = data['val']['X']
+                        self.y = data['val']['y']
                         _val_cost, _val_acc = sess.run([val_cost, val_acc])
                         train_summary = sess.run(merge)
                         writer.add_summary(train_summary)
-                        train_writer.flush()
+                        writer.flush()
                         train_cost_avg.append(_train_cost)
                         train_acc_avg.append(_train_acc)
                         val_cost_avg.append(_val_cost)
@@ -111,4 +118,4 @@ class NN:
                 self.last_model = './workspace/%s_epoch%03i.ckpt' % (self.name, sess.run(last_epoch))
                 _ = saver.save(sess, self.last_model)
 
-                print('Epoch %i / %i completed:\n  avg. training loss: %.5e, avg. training accuracy: %.5f\n  avg. test loss: %.5e, avg. test accuracy: %.5f\n' % (sess.run(last_epoch)+1, sess.run(last_epoch+n_epoch-epoch), train_cost_avg, train_acc_avg, test_cost_avg, test_acc_avg), flush=True)
+                print('Epoch %i / %i completed:\n  avg. training loss: %.5e, avg. training accuracy: %.5f\n  avg. test loss: %.5e, avg. test accuracy: %.5f\n' % (sess.run(last_epoch)+1, sess.run(last_epoch+n_epoch-epoch), train_cost_avg, train_acc_avg, val_cost_avg, val_acc_avg), flush=True)

@@ -73,14 +73,15 @@ def image_batch_handle (preprocessed_folder, validation_size=0.2):
 
         # split into training and validation datasets
         data['train'] = {}; data['val'] = {}
-        data['train']['dataset'] = final_dataset.take(1.-validation_size)
-        data['val']['dataset'] = final_dataset.skip(1.-validation_size)
+        int_validation_size = int(validation_size * ntotal)
+        data['train']['dataset'] = final_dataset.skip(int_validation_size)
+        data['val']['dataset'] = final_dataset.take(int_validation_size)
 
         for dataset_type in ['train', 'val']:
             # divide into batches and return iterator
             dataset = data[dataset_type]['dataset']
             dataset = dataset.batch(batch_size)
-            iterator = dataset.make_one_shot_iterator()
+            iterator = dataset.make_initializable_iterator()
             iter_next = iterator.get_next()
             # import images after drawing a batch
             img_filenames, labels = iter_next
@@ -89,5 +90,6 @@ def image_batch_handle (preprocessed_folder, validation_size=0.2):
             labels = tf.one_hot(labels, classno)
             data[dataset_type]['X'] = imgs
             data[dataset_type]['y'] = labels
+            data[dataset_type]['iter_init'] = iterator.initializer
 
         return data
