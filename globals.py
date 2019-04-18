@@ -8,7 +8,7 @@ min_unique = 100 # minimum number of unique color values for the image
 X_shape = [256,256] # shape of a processed image
 
 # processing properties
-batch_size = 128
+batch_size = 256
 
 # allow importing from NNs folder
 import sys
