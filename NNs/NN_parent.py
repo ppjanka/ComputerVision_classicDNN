@@ -45,6 +45,8 @@ class NN:
         tf.logging.set_verbosity(tf.logging.INFO)
         last_epoch = tf.Variable(-1, name='last_epoch')
         saver = tf.train.Saver()
+        if logfile == None:
+            logfile = './workspace/%s.log' % (self.name,)
 
         # input
         import os
@@ -52,6 +54,13 @@ class NN:
             print(preprocessed_folder + ' does not exist. Please preprocess data using preprocess.py first.')
             return 0
         data = cvio.image_batch_handle(preprocessed_folder, validation_size=validation_size)
+
+        # initialize logfile
+        with open(logfile, 'w') as f:
+            f.write('Label\tClass\tn_sample\n')
+            for cl in range(len(data['class2label'])):
+                f.write('%i\t%s\t%i\n' % (cl, data['label2class'][cl], data['nclass'][cl]))
+            f.write('\nEpoch\tAvgTrainLoss\tAvgTrainAcc\tAvgValLoss\tAvgValAcc\n')
 
         # setup training and validation handles
         optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['y'], self.nn)
@@ -64,14 +73,6 @@ class NN:
             print('Initializing all variables.. ', end='', flush=True)
             sess.run(tf.global_variables_initializer())
             sess.run(tf.local_variables_initializer())
-            print('done.', flush=True)
-
-            print('Initializing logfile.. ', end='', flush=True)
-            if logfile == None:
-                logfile = './workspace/%s.log' % (self.name,)
-            if not os.path.isfile(logfile):
-                with open(logfile, 'a') as f:
-                    f.write('Epoch\tAvgTrainLoss\tAvgTrainAcc\tAvgValLoss\tAvgValAcc\n')
             print('done.', flush=True)
 
             # restore model if specified
