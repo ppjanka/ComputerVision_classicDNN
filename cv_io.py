@@ -28,7 +28,7 @@ def get_filenames (label, ext, preprocessed=False):
     return glob.glob(stem + '*.' + ''.join(list(map(either,ext))))
 
 # returns a handle to iterator.get_next() of images Dataset to be connected to a comp graph
-def image_batch_handle (preprocessed_folder, validation_size=0.2):
+def image_batch_handle (preprocessed_folder, validation_size=0.2, balance_sample=True):
 
     with tf.name_scope('IMG_INPUT'):
 
@@ -57,6 +57,15 @@ def image_batch_handle (preprocessed_folder, validation_size=0.2):
             classno += 1
 
         ntotal = sum(nclass.values())
+
+        # balance the sample if requested
+        if balance_sample:
+            nmin = min(nclass.values())
+            for classno in range(len(datasets)):
+                datasets[classno].shuffle(nclass[classno])
+                datasets[classno].take(nmin)
+                nclass[classno] = nmin
+                nclass[label2class[classno]] = nmin
 
         # merge all datasets
         final_dataset = datasets[0]
