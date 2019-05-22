@@ -7,6 +7,7 @@ import numpy as np
 
 import cv_io as cvio
 import cv_train_val as cvtrain
+import cv_augment as cvaug
 
 class NN:
 
@@ -39,7 +40,10 @@ class NN:
             result = graph.eval({self.X:Xin, self.keep_prob:1.})
         return result
 
-    def train (self, preprocessed_folder='./data_preprocessed', validation_size=0.2, n_epoch=1, input_model='last', output_model=None, logfile=None):
+    def train (self, preprocessed_folder='./data_preprocessed', \
+        validation_size=0.2, augment=False, n_epoch=1, \
+        train_feed_dict={}, val_feed_dict={}, \
+        input_model='last', output_model=None, logfile=None):
 
         # initialize
         tf.logging.set_verbosity(tf.logging.INFO)
@@ -104,14 +108,15 @@ class NN:
 
                 try:
                     while True:
-                        self.X = data['train']['X']
+                        if augment:
+                            self.X = cvaug.augment_handle(data['train']['X'])
                         self.y = data['train']['y']
-                        _, _train_cost, _train_acc = sess.run([optimizer, train_cost, train_acc])
+                        _, _train_cost, _train_acc, train_summary = sess.run([optimizer, train_cost, train_acc, merge], feed_dict=train_feed_dict)
                         self.X = data['val']['X']
                         self.y = data['val']['y']
-                        _val_cost, _val_acc = sess.run([val_cost, val_acc])
-                        train_summary = sess.run(merge)
+                        _val_cost, _val_acc, val_summary = sess.run([val_cost, val_acc, merge], feed_dict=val_feed_dict)
                         writer.add_summary(train_summary, n_summary)
+                        writer.add_summary(val_summary, n_summary)
                         writer.flush()
                         train_cost_avg.append(_train_cost)
                         train_acc_avg.append(_train_acc)

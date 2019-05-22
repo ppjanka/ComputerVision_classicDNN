@@ -20,6 +20,7 @@ class AlexNet (NN.NN):
         super().__init__(n_classes, img_size, tensorboard_verbose, name, init_model)
 
         self.downscale = downscale
+        self.dropout_keepProb = tf.placeholder(tf.float32)
 
         # build the neural network
         with tf.name_scope("AlexNet") as scope:
@@ -96,6 +97,7 @@ class AlexNet (NN.NN):
                 self.weights[layer_name] = tf.Variable(tf.truncated_normal([14,14, in_nfilter, out_nfilter], stddev=0.02), name=(layer_name+'-Weights'))
                 self.biases[layer_name] = tf.Variable(tf.zeros([out_nfilter,]), name=(layer_name+'-Biases'))
 
+                _nn = tf.nn.dropout(_nn, self.dropout_keepProb)
                 _nn = tf.tensordot(_nn, self.weights[layer_name], axes=[[1,2,3],[0,1,2]])
                 _nn = tf.add(_nn, self.biases[layer_name])
                 _nn = tf.nn.relu(_nn)
@@ -107,6 +109,7 @@ class AlexNet (NN.NN):
                 self.weights[layer_name] = tf.Variable(tf.truncated_normal([in_nfilter, out_nfilter], stddev=0.02), name=(layer_name+'-Weights'))
                 self.biases[layer_name] = tf.Variable(tf.zeros([out_nfilter,]), name=(layer_name+'-Biases'))
 
+                _nn = tf.nn.dropout(_nn, self.dropout_keepProb)
                 _nn = tf.matmul(_nn, self.weights[layer_name])
                 _nn = tf.add(_nn, self.biases[layer_name])
                 _nn = tf.nn.relu(_nn)
