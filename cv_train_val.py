@@ -13,7 +13,7 @@ def training_handle (y_train, nn_train, cost_function=tf.nn.softmax_cross_entrop
         accuracy = tf.reduce_mean(tf.metrics.accuracy(tf.argmax(y_train,1), tf.argmax(nn_train[:num_records],1)), axis=0)
         tf.summary.scalar("acc_train", accuracy)
         optimizer = optimizer_function(**optimizer_kwargs).minimize(cost)
-        return optimizer, cost, accuracy
+        return optimizer, cost, accuracy, num_records, y_train, nn_train, cost_function(labels=y_train, logits=nn_train[:num_records])
 
 # returns tf graph handles to validation data
 def validation_handle (y_val, nn_val, cost_function=tf.nn.softmax_cross_entropy_with_logits_v2):

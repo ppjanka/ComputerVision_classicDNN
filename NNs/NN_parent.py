@@ -2,6 +2,8 @@
 
 exec(open("./globals.py").read()) # read global variables
 
+import os
+
 import tensorflow as tf
 import numpy as np
 
@@ -43,6 +45,7 @@ class NN:
     def train (self, preprocessed_folder='./data_preprocessed', \
         validation_size=0.2, augment=False, n_epoch=1, \
         train_feed_dict={}, val_feed_dict={}, \
+        optimizer=tf.train.AdamOptimizer, optimizer_kwargs={}, \
         input_model='last', output_model=None, logfile=None):
 
         # initialize
@@ -59,20 +62,23 @@ class NN:
             return 0
         data = cvio.image_batch_handle(preprocessed_folder, validation_size=validation_size)
 
-        # initialize logfile
-        with open(logfile, 'w') as f:
-            f.write('Label\tClass\tn_sample\n')
-            for cl in range(len(data['class2label'])):
-                f.write('%i\t%s\t%i\n' % (cl, data['label2class'][cl], data['nclass'][cl]))
-            f.write('\nEpoch\tAvgTrainLoss\tAvgTrainAcc\tAvgValLoss\tAvgValAcc\n')
+        # initialize logfile if needed
+        if not os.path.isfile(logfile):
+            print('Log file doesn\'t exist! Will be recreated.')
+        if (input_model == 'last' and self.last_model == None) or input_model == None or not os.path.isfile(logfile):
+            with open(logfile, 'w') as f:
+                f.write('Label\tClass\tn_sample\n')
+                for cl in range(len(data['class2label'])):
+                    f.write('%i\t%s\t%i\n' % (cl, data['label2class'][cl], data['nclass'][cl]))
+                f.write('\nEpoch\tAvgTrainLoss\tAvgTrainAcc\tAvgValLoss\tAvgValAcc\n')
 
         # setup training and validation handles
-        optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['y'], self.nn)
+        optimizer, train_cost, train_acc, num_records, y_train, nn_train, cost_unit = cvtrain.training_handle (data['train']['y'], self.nn, optimizer_kwargs=optimizer_kwargs)
         val_cost, val_acc = cvtrain.validation_handle(data['val']['y'], self.nn)
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)) as sess:
               
-            writer = tf.summary.FileWriter('./workspace/log_%s/1/train' % self.name, sess.graph)
+            #writer = tf.summary.FileWriter('./workspace/log_%s/1/train' % self.name, sess.graph)
 
             print('Initializing all variables.. ', end='', flush=True)
             sess.run(tf.global_variables_initializer())
@@ -85,7 +91,7 @@ class NN:
                 saver.restore(sess, self.last_model)
                 print('done.', flush=True)
             elif input_model not in ['last', None]:
-                print('Restoring model:\n  %s' % self.input_model, flush=True)
+                print('Restoring model:\n  %s' % input_model, flush=True)
                 saver.restore(sess, input_model)
                 print('done.', flush=True)
 
@@ -107,22 +113,30 @@ class NN:
                 _ = sess.run([data['train']['iter_init'], data['val']['iter_init']])
 
                 try:
+                    self.X = data['train']['X']
+                    if augment:
+                        self.X = cvaug.augment_handle(self.X)
+                    self.y = data['train']['y']
                     while True:
-                        if augment:
-                            self.X = cvaug.augment_handle(data['train']['X'])
-                        self.y = data['train']['y']
-                        _, _train_cost, _train_acc, train_summary = sess.run([optimizer, train_cost, train_acc, merge], feed_dict=train_feed_dict)
-                        self.X = data['val']['X']
-                        self.y = data['val']['y']
-                        _val_cost, _val_acc, val_summary = sess.run([val_cost, val_acc, merge], feed_dict=val_feed_dict)
-                        writer.add_summary(train_summary, n_summary)
-                        writer.add_summary(val_summary, n_summary)
-                        writer.flush()
+                        _, _train_cost, _train_acc = sess.run([optimizer, train_cost, train_acc], feed_dict=train_feed_dict)
+                        #train_summary = sess.run(merge) # uses another get_next from iterator, causing us to skip data...
+                        #writer.add_summary(train_summary, n_summary)
+                        #writer.flush()
                         train_cost_avg.append(_train_cost)
                         train_acc_avg.append(_train_acc)
+                        n_summary += 1
+                        print('loop done')
+                except tf.errors.OutOfRangeError:
+                    pass
+                try:
+                    self.X = data['val']['X']
+                    self.y = data['val']['y']
+                    while True:
+                        _val_cost, _val_acc = sess.run([val_cost, val_acc], feed_dict=val_feed_dict)
+                        #writer.add_summary(val_summary, n_summary)
+                        #writer.flush()
                         val_cost_avg.append(_val_cost)
                         val_acc_avg.append(_val_acc)
-                        n_summary += 1
                 except tf.errors.OutOfRangeError:
                     pass
 
