@@ -10,8 +10,10 @@ extensions = ['jpg', 'png', 'bmp', 'gif'] # raw input file formats
 # sources:
 # - https://www.tensorflow.org/guide/datasets
 
+import os
+
 import tensorflow as tf
-import io
+import cv_io as io
 
 def _preprocess_image (filename, ext):
     image_string = tf.read_file(filename[0])
@@ -53,7 +55,7 @@ if __name__ == '__main__':
 
     processed = 0
     io_errors = 0
-    for label in ['cats','dogs']:
+    for label in os.listdir('./data'):
         for extension in extensions:
             filenames = [[],[]]
             filenames[0] = io.get_filenames(label, extension)

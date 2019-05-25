@@ -97,8 +97,8 @@ def image_batch_handle (preprocessed_folder, validation_size=0.2, balance_sample
             imgs = tf.map_fn(lambda img : tf.image.decode_jpeg(tf.read_file(img)), img_filenames, dtype=tf.uint8)
             imgs = tf.image.convert_image_dtype(imgs, tf.float32)
             labels = tf.one_hot(labels, classno)
-            data[dataset_type]['X'] = imgs
-            data[dataset_type]['y'] = labels
+            data[dataset_type]['X'] = tf.stop_gradient(imgs)
+            data[dataset_type]['y'] = tf.stop_gradient(labels)
             data[dataset_type]['iter_init'] = iterator.initializer
 
         return data
