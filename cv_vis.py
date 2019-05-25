@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objs as go
 from plotly import tools
 
-def plot_training_stats (logfile):
+def plot_training_stats (logfile, log_loss=True):
 
     with open(logfile, 'r') as f:
         buff = f.readlines()
@@ -32,6 +32,8 @@ def plot_training_stats (logfile):
     fig.append_trace(go.Scatter(x=df.Epoch, y=df.AvgTrainAcc, name='Train', showlegend=False, line=dict(color='#1F77B4')), 2,1)
     fig.append_trace(go.Scatter(x=df.Epoch, y=df.AvgValAcc, name='Val', showlegend=False, line=dict(color='#FF7F0E')), 2,1)
     fig['layout']['xaxis2'].update(title='Epoch')
+    if log_loss:
+        fig['layout']['yaxis1'].update(type='log')
 
     for cl in pure_guess.keys():
         fig.append_trace(go.Scatter(x=df.Epoch, y=(pure_guess[cl]*np.ones(len(df.Epoch))), mode='lines', name=('Always %s' % cl), showlegend=False, line=dict(color='#000000', dash='dot')), 2,1)
