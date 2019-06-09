@@ -19,22 +19,20 @@ class NN:
         self.last_model = init_model
 
         # "placeholders" to be replaced by data tensors
-        self.X = tf.ones(dtype=tf.float32, shape=[batch_size, *img_size, 1], name='INPUT')
-        self.y = tf.ones(dtype=tf.float32, shape=[batch_size, n_classes, 1], name='LABELS')
+        self.X = tf.placeholder(dtype=tf.float32, shape=[batch_size, *img_size, 1], name='INPUT')
+        self.y = tf.placeholder(dtype=tf.float32, shape=[batch_size, n_classes, 1], name='LABELS')
 
         self.n_classes = n_classes
 
         self.layers = []
         self.weights = {}
         self.biases = {}
-
-        self.nn = None
       
     def predict (self, Xin, model=None):
         if model == None:
             model = self.last_model
           
-        graph = self.nn
+        graph = self.nn(Xin)
         saver = tf.train.Saver()
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=True, allow_soft_placement=True)) as sess:
@@ -43,10 +41,11 @@ class NN:
         return result
 
     def train (self, preprocessed_folder='./data_preprocessed', \
-        validation_size=0.2, augment=False, n_epoch=1, \
-        train_feed_dict={}, val_feed_dict={}, \
+        balance_sample=True, validation_size=0.2, augment=False, n_epoch=1, \
+        train_feed_dict={}, val_feed_dict={}, augment_dict={}, \
         optimizer=tf.train.AdamOptimizer, optimizer_kwargs={}, \
-        input_model='last', output_model=None, logfile=None):
+        input_model='last', output_model=None, logfile=None, \
+        save_all_ckpt=False):
 
         # initialize
         tf.logging.set_verbosity(tf.logging.INFO)
@@ -60,7 +59,7 @@ class NN:
         if not os.path.isdir(preprocessed_folder):
             print(preprocessed_folder + ' does not exist. Please preprocess data using preprocess.py first.')
             return 0
-        data = cvio.image_batch_handle(preprocessed_folder, validation_size=validation_size)
+        data = cvio.image_batch_handle(preprocessed_folder, validation_size=validation_size, balance_sample=balance_sample)
 
         # initialize logfile if needed
         if not os.path.isfile(logfile):
@@ -72,9 +71,17 @@ class NN:
                     f.write('%i\t%s\t%i\n' % (cl, data['label2class'][cl], data['nclass'][cl]))
                 f.write('\nEpoch\tAvgTrainLoss\tAvgTrainAcc\tAvgValLoss\tAvgValAcc\n')
 
-        # setup training and validation handles
-        optimizer, train_cost, train_acc, num_records, y_train, nn_train, cost_unit = cvtrain.training_handle (data['train']['y'], self.nn, optimizer_kwargs=optimizer_kwargs)
-        val_cost, val_acc = cvtrain.validation_handle(data['val']['y'], self.nn)
+        # setup training handles
+        X_feed = data['train']['X']
+        if augment:
+            X_feed = cvaug.augment_handle(X_feed, **augment_dict)
+        y_feed = data['train']['y']
+        optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['y'], self.nn(X_feed), optimizer_kwargs=optimizer_kwargs)
+
+        # setup validation handles
+        X_feed = data['val']['X']
+        y_feed = data['val']['y']
+        val_cost, val_acc = cvtrain.validation_handle(data['val']['y'], self.nn(X_feed))
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)) as sess:
               
@@ -96,7 +103,7 @@ class NN:
                 print('done.', flush=True)
 
             # summary init
-            merge = tf.summary.merge_all()
+            #merge = tf.summary.merge_all()
               
             # train
             n_summary = 0
@@ -113,10 +120,6 @@ class NN:
                 _ = sess.run([data['train']['iter_init'], data['val']['iter_init']])
 
                 try:
-                    self.X = data['train']['X']
-                    if augment:
-                        self.X = cvaug.augment_handle(self.X)
-                    self.y = data['train']['y']
                     while True:
                         _, _train_cost, _train_acc = sess.run([optimizer, train_cost, train_acc], feed_dict=train_feed_dict)
                         #train_summary = sess.run(merge) # uses another get_next from iterator, causing us to skip data...
@@ -125,12 +128,9 @@ class NN:
                         train_cost_avg.append(_train_cost)
                         train_acc_avg.append(_train_acc)
                         n_summary += 1
-                        print('loop done')
                 except tf.errors.OutOfRangeError:
                     pass
                 try:
-                    self.X = data['val']['X']
-                    self.y = data['val']['y']
                     while True:
                         _val_cost, _val_acc = sess.run([val_cost, val_acc], feed_dict=val_feed_dict)
                         #writer.add_summary(val_summary, n_summary)
@@ -146,8 +146,12 @@ class NN:
                 val_cost_avg = np.mean(val_cost_avg)
 
                 self.last_model = './workspace/%s_epoch%03i.ckpt' % (self.name, sess.run(last_epoch))
-                _ = saver.save(sess, self.last_model)
+                if save_all_ckpt:
+                    _ = saver.save(sess, self.last_model)
 
                 print('Epoch %i / %i completed:\n  avg. training loss: %.5e, avg. training accuracy: %.5f\n  avg. test loss: %.5e, avg. test accuracy: %.5f\n' % (sess.run(last_epoch)+1, sess.run(last_epoch+n_epoch-epoch), train_cost_avg, train_acc_avg, val_cost_avg, val_acc_avg), flush=True)
                 with open(logfile, 'a') as f:
                     f.write('%i\t%.10e\t%.10e\t%.10e\t%.10e\n' % (sess.run(last_epoch)+1, train_cost_avg, train_acc_avg, val_cost_avg, val_acc_avg))
+
+            if not save_all_ckpt:
+                _ = saver.save(sess, self.last_model)
