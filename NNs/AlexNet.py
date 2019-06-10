@@ -33,7 +33,7 @@ class AlexNet (NN.NN):
             in_nfilter = 1; out_nfilter = max(1,int(48/self.downscale))
             with tf.name_scope(layer_name):
 
-                self.weights[layer_name] = tf.Variable(tf.truncated_normal([*X_shape,in_nfilter, out_nfilter], stddev=init_stddev), name=(layer_name+'-Weights'))
+                self.weights[layer_name] = tf.Variable(tf.truncated_normal([11, 11,in_nfilter, out_nfilter], stddev=init_stddev), name=(layer_name+'-Weights'))
                 self.biases[layer_name] = tf.Variable(tf.zeros([out_nfilter,]), name=(layer_name+'-Biases'))
 
             layer_name = "ConvPool2"; self.layers.append(layer_name)
