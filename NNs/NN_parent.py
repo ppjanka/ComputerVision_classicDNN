@@ -44,6 +44,7 @@ class NN:
         balance_sample=True, validation_size=0.2, augment=False, n_epoch=1, \
         train_feed_dict={}, val_feed_dict={}, augment_dict={}, \
         optimizer=tf.train.AdamOptimizer, optimizer_kwargs={}, \
+        pretrain=False, pretrain_interval=50, \
         input_model='last', output_model=None, logfile=None, \
         save_all_ckpt=False):
 
@@ -76,12 +77,20 @@ class NN:
         if augment:
             X_feed = cvaug.augment_handle(X_feed, **augment_dict)
         y_feed = data['train']['y']
-        optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['y'], self.nn(X_feed), optimizer_kwargs=optimizer_kwargs)
+        if pretrain:
+            _nn = self.nn(X_feed, epoch=tf.stop_gradient(last_epoch), pretrain=pretrain, pretrain_interval=pretrain_interval)
+        else:
+            _nn = self.nn(X_feed)
+        optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['y'], _nn, optimizer_function=optimizer, optimizer_kwargs=optimizer_kwargs)
 
         # setup validation handles
         X_feed = data['val']['X']
         y_feed = data['val']['y']
-        val_cost, val_acc = cvtrain.validation_handle(data['val']['y'], self.nn(X_feed))
+        if pretrain:
+            _nn = self.nn(X_feed, epoch=tf.stop_gradient(last_epoch), pretrain=pretrain, pretrain_interval=pretrain_interval)
+        else:
+            _nn = self.nn(X_feed)
+        val_cost, val_acc = cvtrain.validation_handle(data['val']['y'], _nn)
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)) as sess:
               
