@@ -41,10 +41,11 @@ def _preprocess_image (filename, ext):
     image_standard = tf.image.convert_image_dtype(image_resized, tf.uint8)
     image_encoded = tf.image.encode_jpeg(image_standard)
     # apply stddev condition
-    image_result = tf.cond( \
-        tf.logical_and(var > min_variance, no_unique > min_unique), \
-        lambda : image_encoded, \
-        lambda : tf.constant('', dtype=tf.string)) # don't do other steps if we filter
+    #image_result = tf.cond( \
+    #    tf.logical_and(var > min_variance, no_unique > min_unique), \
+    #    lambda : image_encoded, \
+    #    lambda : tf.constant('', dtype=tf.string)) # don't do other steps if we filter
+    image_result = image_encoded
     return var, no_unique, image_result, filename[1]
 
 preprocess_image = {}

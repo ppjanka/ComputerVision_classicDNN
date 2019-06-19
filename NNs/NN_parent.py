@@ -43,15 +43,14 @@ class NN:
     def train (self, preprocessed_folder='./data_preprocessed', \
         balance_sample=True, validation_size=0.2, augment=False, n_epoch=1, \
         train_feed_dict={}, val_feed_dict={}, augment_dict={}, \
-        optimizer=tf.train.AdamOptimizer, optimizer_kwargs={}, \
-        pretrain=False, pretrain_interval=50, \
+        optimizer_function=tf.train.AdamOptimizer, optimizer_kwargs={}, \
+        pretrain_level=100, \
         input_model='last', output_model=None, logfile=None, \
         save_all_ckpt=False):
 
         # initialize
         tf.logging.set_verbosity(tf.logging.INFO)
         last_epoch = tf.Variable(-1, name='last_epoch')
-        saver = tf.train.Saver()
         if logfile == None:
             logfile = './workspace/%s.log' % (self.name,)
 
@@ -77,20 +76,17 @@ class NN:
         if augment:
             X_feed = cvaug.augment_handle(X_feed, **augment_dict)
         y_feed = data['train']['y']
-        if pretrain:
-            _nn = self.nn(X_feed, epoch=tf.stop_gradient(last_epoch), pretrain=pretrain, pretrain_interval=pretrain_interval)
-        else:
-            _nn = self.nn(X_feed)
-        optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['y'], _nn, optimizer_function=optimizer, optimizer_kwargs=optimizer_kwargs)
+        _nn = self.nn(X_feed, pretrain_level=pretrain_level)
+        optimizer, train_cost, train_acc = cvtrain.training_handle (data['train']['y'], _nn, optimizer_function=optimizer_function, optimizer_kwargs=optimizer_kwargs)
 
         # setup validation handles
         X_feed = data['val']['X']
         y_feed = data['val']['y']
-        if pretrain:
-            _nn = self.nn(X_feed, epoch=tf.stop_gradient(last_epoch), pretrain=pretrain, pretrain_interval=pretrain_interval)
-        else:
-            _nn = self.nn(X_feed)
+        _nn = self.nn(X_feed, pretrain_level=pretrain_level)
         val_cost, val_acc = cvtrain.validation_handle(data['val']['y'], _nn)
+
+        # initialize saver after all variables declared, exclude optimizer vars
+        saver = tf.train.Saver(tf.trainable_variables())
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)) as sess:
               
@@ -127,6 +123,15 @@ class NN:
 
                 # initialize dataset iterators
                 _ = sess.run([data['train']['iter_init'], data['val']['iter_init']])
+
+                if False:
+                    neur = None
+                    try:
+                        neur = sess.run([self.nn(data['train']['X']), data['train']['y']], feed_dict=train_feed_dict)
+                    except tf.errors.OutOfRangeError:
+                        pass
+                    print(neur, flush=True)
+                    _ = sess.run([data['train']['iter_init'], data['val']['iter_init']])
 
                 try:
                     while True:

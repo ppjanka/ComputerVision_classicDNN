@@ -207,7 +207,7 @@ class VGGNet (NN.NN):
                 self.biases[layer_name] = tf.Variable(tf.zeros([self.out_nfilter[layer_name],]), name=(layer_name+'-Biases'))
 
 
-    def nn (self, X, epoch=0, pretrain=False, pretrain_interval=50):
+    def nn (self, X, pretrain_level=100):
 
         # build the neural network
         with tf.name_scope("VGGNet") as scope:
@@ -219,7 +219,11 @@ class VGGNet (NN.NN):
                 with tf.name_scope(layer_name):
                     X = tf.image.resize_images(X, size=[224,224], preserve_aspect_ratio=True)
 
-            #X = X - tf.reduce_mean(X, axis=[1,2,3])
+            if False: # expensive
+                mean = tf.reduce_mean(X, axis=[1,2,3])
+                Xmin = tf.reduce_min(X)
+                Xmax = tf.reduce_max(X)
+                X = (X-Xmin)/(Xmax-Xmin) - 0.5
 
             layer_name = "1_Conv"
             with tf.name_scope(layer_name):
@@ -229,16 +233,14 @@ class VGGNet (NN.NN):
                 _nn = tf.nn.relu(_nn)
             _subnn[layer_name] = _nn
 
-            layer_name = "2_Conv"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
-
-            if pretrain:
-                _nn = tf.cond(epoch < pretrain_interval, lambda : _subnn["1_Conv"], lambda : _subnn["2_Conv"])
+            if pretrain_level > 0:
+                layer_name = "2_Conv"
+                with tf.name_scope(layer_name):
+                    _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                        strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                    _nn = tf.add(_nn, self.biases[layer_name])
+                    _nn = tf.nn.relu(_nn)
+                _subnn[layer_name] = _nn
 
             layer_name = "3_MaxPool"
             with tf.name_scope(layer_name):
@@ -253,16 +255,14 @@ class VGGNet (NN.NN):
                 _nn = tf.nn.relu(_nn)
             _subnn[layer_name] = _nn
 
-            layer_name = "5_Conv"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
-
-            if pretrain:
-                _nn = tf.cond(epoch < pretrain_interval, lambda : _subnn["4_Conv"], lambda : _subnn["5_Conv"])
+            if pretrain_level > 0:
+                layer_name = "5_Conv"
+                with tf.name_scope(layer_name):
+                    _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                        strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                    _nn = tf.add(_nn, self.biases[layer_name])
+                    _nn = tf.nn.relu(_nn)
+                _subnn[layer_name] = _nn
 
             layer_name = "6_MaxPool"
             with tf.name_scope(layer_name):
@@ -277,34 +277,36 @@ class VGGNet (NN.NN):
                 _nn = tf.nn.relu(_nn)
             _subnn[layer_name] = _nn
 
-            layer_name = "8_Conv"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+            if pretrain_level > 0:
+                layer_name = "8_Conv"
+                with tf.name_scope(layer_name):
+                    _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                        strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                    _nn = tf.add(_nn, self.biases[layer_name])
+                    _nn = tf.nn.relu(_nn)
+                _subnn[layer_name] = _nn
 
-            _nn = _subnn["8_Conv"]
-            layer_name = "9_Conv1"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+            if pretrain_level > 1:
 
-            _nn = _subnn["8_Conv"]
-            layer_name = "9_Conv3"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+                if pretrain_level < 3:
+                    _nn = _subnn["8_Conv"]
+                    layer_name = "9_Conv1"
+                    with tf.name_scope(layer_name):
+                        _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                            strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                        _nn = tf.add(_nn, self.biases[layer_name])
+                        _nn = tf.nn.relu(_nn)
+                    _subnn[layer_name] = _nn
 
-            if pretrain:
-                _nn = tf.case([(epoch < 2*pretrain_interval, lambda : _subnn["8_Conv"]), (epoch < 3*pretrain_interval, lambda : _subnn["9_Conv1"])], default=(lambda : _subnn["9_Conv3"]))
+                if pretrain_level > 2:
+                    _nn = _subnn["8_Conv"]
+                    layer_name = "9_Conv3"
+                    with tf.name_scope(layer_name):
+                        _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                            strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                        _nn = tf.add(_nn, self.biases[layer_name])
+                        _nn = tf.nn.relu(_nn)
+                    _subnn[layer_name] = _nn
 
             layer_name = "10_MaxPool"
             with tf.name_scope(layer_name):
@@ -319,34 +321,36 @@ class VGGNet (NN.NN):
                 _nn = tf.nn.relu(_nn)
             _subnn[layer_name] = _nn
 
-            layer_name = "12_Conv"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+            if pretrain_level > 0:
+                layer_name = "12_Conv"
+                with tf.name_scope(layer_name):
+                    _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                        strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                    _nn = tf.add(_nn, self.biases[layer_name])
+                    _nn = tf.nn.relu(_nn)
+                _subnn[layer_name] = _nn
 
-            _nn = _subnn['12_Conv']
-            layer_name = "13_Conv1"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+            if pretrain_level > 1:
 
-            _nn = _subnn['12_Conv']
-            layer_name = "13_Conv3"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+                if pretrain_level < 3:
+                    _nn = _subnn['12_Conv']
+                    layer_name = "13_Conv1"
+                    with tf.name_scope(layer_name):
+                        _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                            strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                        _nn = tf.add(_nn, self.biases[layer_name])
+                        _nn = tf.nn.relu(_nn)
+                    _subnn[layer_name] = _nn
 
-            if pretrain:
-                _nn = tf.case([(epoch < 2*pretrain_interval, lambda : _subnn["12_Conv"]), (epoch < 3*pretrain_interval, lambda : _subnn["13_Conv1"])], default=(lambda : _subnn["13_Conv3"]))
+                if pretrain_level > 2:
+                    _nn = _subnn['12_Conv']
+                    layer_name = "13_Conv3"
+                    with tf.name_scope(layer_name):
+                        _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                            strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                        _nn = tf.add(_nn, self.biases[layer_name])
+                        _nn = tf.nn.relu(_nn)
+                    _subnn[layer_name] = _nn
 
             layer_name = "14_MaxPool"
             with tf.name_scope(layer_name):
@@ -361,34 +365,36 @@ class VGGNet (NN.NN):
                 _nn = tf.nn.relu(_nn)
             _subnn[layer_name] = _nn
 
-            layer_name = "16_Conv"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+            if pretrain_level > 0:
+                layer_name = "16_Conv"
+                with tf.name_scope(layer_name):
+                    _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                        strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                    _nn = tf.add(_nn, self.biases[layer_name])
+                    _nn = tf.nn.relu(_nn)
+                _subnn[layer_name] = _nn
 
-            _nn = _subnn['16_Conv']
-            layer_name = "17_Conv1"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+            if pretrain_level > 1:
 
-            _nn = _subnn['16_Conv']
-            layer_name = "17_Conv3"
-            with tf.name_scope(layer_name):
-                _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
-                    strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-            _subnn[layer_name] = _nn
+                if pretrain_level < 3:
+                    _nn = _subnn['16_Conv']
+                    layer_name = "17_Conv1"
+                    with tf.name_scope(layer_name):
+                        _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                            strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                        _nn = tf.add(_nn, self.biases[layer_name])
+                        _nn = tf.nn.relu(_nn)
+                    _subnn[layer_name] = _nn
 
-            if pretrain:
-                _nn = tf.case([(epoch < 2*pretrain_interval, lambda : _subnn["16_Conv"]), (epoch < 3*pretrain_interval, lambda : _subnn["17_Conv1"])], default=(lambda : _subnn["17_Conv3"]))
+                if pretrain_level > 2:
+                    _nn = _subnn['16_Conv']
+                    layer_name = "17_Conv3"
+                    with tf.name_scope(layer_name):
+                        _nn = tf.nn.conv2d(_nn,self.weights[layer_name], \
+                            strides=[1,1,1,1], padding='SAME', name=(layer_name+'-conv2d'))
+                        _nn = tf.add(_nn, self.biases[layer_name])
+                        _nn = tf.nn.relu(_nn)
+                    _subnn[layer_name] = _nn
 
             layer_name = "18_MaxPool"
             with tf.name_scope(layer_name):
@@ -403,13 +409,14 @@ class VGGNet (NN.NN):
                 _nn = tf.nn.dropout(_nn, self.dropout_keepProb)
             _subnn[layer_name] = _nn
 
-            layer_name = "20_Dense"
-            with tf.name_scope(layer_name):
-                _nn = tf.tensordot(_nn, self.weights[layer_name], axes=[1,0])
-                _nn = tf.add(_nn, self.biases[layer_name])
-                _nn = tf.nn.relu(_nn)
-                _nn = tf.nn.dropout(_nn, self.dropout_keepProb)
-            _subnn[layer_name] = _nn
+            if pretrain_level > 1:
+                layer_name = "20_Dense"
+                with tf.name_scope(layer_name):
+                    _nn = tf.tensordot(_nn, self.weights[layer_name], axes=[1,0])
+                    _nn = tf.add(_nn, self.biases[layer_name])
+                    _nn = tf.nn.relu(_nn)
+                    _nn = tf.nn.dropout(_nn, self.dropout_keepProb)
+                _subnn[layer_name] = _nn
 
             layer_name = "21_Output"
             with tf.name_scope(layer_name):
