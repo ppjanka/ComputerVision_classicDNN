@@ -27,6 +27,10 @@ class NN:
         self.layers = []
         self.weights = {}
         self.biases = {}
+
+    # copy weights from pretrained levels to the ones to be trained -- might be easier to train this way
+    def init_pretrain_level (self, sess, pretrain_level):
+        pass
       
     def predict (self, Xin, model=None):
         if model == None:
@@ -106,6 +110,9 @@ class NN:
                 print('Restoring model:\n  %s' % input_model, flush=True)
                 saver.restore(sess, input_model)
                 print('done.', flush=True)
+
+            # initialize pretrain levels if needed
+            self.init_pretrain_level(sess, pretrain_level)
 
             # summary init
             #merge = tf.summary.merge_all()
