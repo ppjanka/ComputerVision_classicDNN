@@ -1,5 +1,5 @@
 # ComputerVision_classicDNN
-Playing with classical Computer Vision DNNs from the literature.
+Playing with classical Computer Vision DNNs from the literature. For my walk-throughs of different architectures go to NNs/*.ipynb.
 
 1) Data and preprocessing:
  - data_black-vs-white: contains two jpg files with black and white images for sanity checks
