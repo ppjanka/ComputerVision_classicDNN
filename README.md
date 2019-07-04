@@ -1,5 +1,9 @@
 # ComputerVision_classicDNN
-Playing with classical Computer Vision DNNs from the literature.
+Playing with classical Computer Vision DNNs from the literature: AlexNet, ZFNet, and VGGNet.
+
+**For my walk-throughs trying out different architectures go directly to NNs/*.ipynb.**
+
+-----------------------------------------------------------------------------------------
 
 1) Data and preprocessing:
  - data_black-vs-white: contains two jpg files with black and white images for sanity checks
@@ -21,3 +25,14 @@ Playing with classical Computer Vision DNNs from the literature.
    - NNs/AlexNet.pdf: the original paper, from http://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf
    - NNs/AlexNet.py: defines AlexNet and its properties
    - NNs/AlexNet.ipynb: my run through AlexNet (uses: NNs/AlexNet_logs, the cv.py used is contained in AlexNet_run.py)
+ - ZFNet (M. Zeiler and R. Fergus, 2013):
+   - NNs/ZFNet.pdf: the original paper, arxiv.org version
+   - NNs/ZFNet.py: defines ZFNet and its properties
+   - NNs/ZFNet.ipynb: my run through ZFNet (uses: NNs/ZF_logs, the cv.py used is contained in ZFNet_run.py)
+ - VGGNet (K. Simonyan and A. Zisserman, 2014):
+   - NNs/VGGNet.pdf: the original paper, arxiv.org version
+   - NNs/VGGNet.py: defines VGGNet and its properties
+   - NNs/VGGNet.ipynb: my run through VGGNet (uses: NNs/VGG_logs, the cv.py used is contained in VGGNet_run.py)
+   
+   
+   
